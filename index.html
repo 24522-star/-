@@ -44,18 +44,6 @@
       font-size: 14px;
     }
 
-    .user-profile {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: rgba(0, 0, 0, 0.4);
-      padding: 12px 20px;
-      border-radius: 14px;
-      margin-bottom: 20px;
-    }
-    .user-info { display: flex; align-items: center; gap: 10px; }
-    .user-avatar { width: 32px; height: 32px; border-radius: 50%; }
-
     .quiz-box {
       background: rgba(0,0,0,0.2);
       border-radius: 16px;
@@ -121,7 +109,6 @@
 
     .primary-btn { background: #4fc3f7; color: #111; }
     .success-btn { background: #4caf50; color: white; }
-    .auth-btn { background: #ff5722; color: white; }
 
     .status {
       min-height: 24px;
@@ -138,16 +125,14 @@
     }
     .correct { color: #4caf50; }
     .wrong { color: #f44336; }
-
-    .hidden { display: none !important; }
   </style>
 
+  <!-- Firebase v10 SDK 라이브러리 로드 -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // 1. [필수] 본인의 Firebase 설정값으로 채워주세요!
+    // 1. Firebase 구성 정보 설정 (향후 기능 확장을 위해 유지)
     const firebaseConfig = {
       apiKey: "YOUR_FIREBASE_API_KEY",
       authDomain: "YOUR_FIREBASE_AUTH_DOMAIN",
@@ -159,9 +144,7 @@
 
     // Firebase 초기화
     const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
     const db = getFirestore(app);
-    const provider = new GoogleAuthProvider();
 
     // 2. OpenAI API Key 설정
     const OPENAI_API_KEY = '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';
@@ -169,17 +152,10 @@
     // 퀴즈용 게임 리스트
     const GAME_LIST = ["리그 오브 레전드", "오버워치", "마인크래프트", "스타크래프트", "메이플스토리", "던전앤파이터", "배틀그라운드", "발로란트", "서든어택", "로스트아크"];
 
-    let currentUser = null;
     let currentScore = 0;
     let currentAnswer = ""; 
 
     // DOM 요소
-    const loginSection = document.getElementById('loginSection');
-    const quizSection = document.getElementById('quizSection');
-    const loginBtn = document.getElementById('loginBtn');
-    const logoutBtn = document.getElementById('logoutBtn');
-    const userNameDisplay = document.getElementById('userName');
-    const userAvatar = document.getElementById('userAvatar');
     const scoreDisplay = document.getElementById('scoreDisplay');
     const statusBox = document.getElementById('statusBox');
     const audioPlayer = document.getElementById('audioPlayer');
@@ -189,58 +165,22 @@
     const resultBox = document.getElementById('resultBox');
 
     // 이벤트 바인딩
-    loginBtn.addEventListener('click', () => signInWithPopup(auth, provider));
-    logoutBtn.addEventListener('click', () => signOut(auth));
     nextBtn.addEventListener('click', generateNewQuiz);
     submitBtn.addEventListener('click', checkAnswer);
     answerInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') checkAnswer(); });
 
-    // 인증 상태 체크
-    onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        currentUser = user;
-        userNameDisplay.textContent = user.displayName;
-        userAvatar.src = user.photoURL || 'https://via.placeholder.com/32';
-        
-        loginSection.classList.add('hidden');
-        quizSection.classList.remove('hidden');
-        
-        await loadUserScore(user.uid);
-        generateNewQuiz();
-      } else {
-        currentUser = null;
-        loginSection.classList.remove('hidden');
-        quizSection.classList.add('hidden');
-      }
+    // 브라우저 저장소(LocalStorage)에서 기존 내 점수 가져오기 및 즉시 시작
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedScore = localStorage.getItem('game_quiz_score');
+      currentScore = savedScore ? parseInt(savedScore, 10) : 0;
+      scoreDisplay.textContent = currentScore;
+      
+      // 첫 문제 바로 생성
+      generateNewQuiz();
     });
 
-    // DB에서 점수 로드
-    async function loadUserScore(uid) {
-      statusBox.textContent = "사용자 데이터를 불러오는 중...";
-      const docRef = doc(db, "quiz_scores", uid);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        currentScore = docSnap.data().score || 0;
-      } else {
-        currentScore = 0;
-      }
-      scoreDisplay.textContent = currentScore;
-      statusBox.textContent = "데이터 로드 완료!";
-    }
-
-    // DB에 점수 저장
-    async function saveUserScore(uid, score) {
-      await setDoc(doc(db, "quiz_scores", uid), {
-        username: currentUser.displayName,
-        score: score,
-        updatedAt: new Date()
-      }, { merge: true });
-    }
-
-    // 🚀 새로운 퀴즈 생성 (OpenAI 직통 버전)
+    // 🚀 새로운 퀴즈 생성
     async function generateNewQuiz() {
-      if (!currentUser) return;
-      
       answerInput.value = "";
       answerInput.disabled = false;
       submitBtn.disabled = false;
@@ -251,9 +191,9 @@
       currentAnswer = GAME_LIST[randomIndex];
 
       try {
-        setLoading(true, "ChatGPT가 사운드를 묘사하는 중...");
+        setLoading(true, "ChatGPT가 사운드를 열심히 묘사하고 있습니다...");
 
-        // 1. OpenAI Chat Completions API 직접 호출 (텍스트 생성)
+        // 1. OpenAI Chat API 호출
         const gptPrompt = `너는 게임 사운드 퀴즈 출제자야. 제시된 게임의 '로그인 창 화면 접속 사운드', '시그니처 배경음악(BGM)', 또는 가장 유명한 '캐릭터 대사나 효과음'을 실감 나게 말로 묘사해 줘. 
         주의할 점:
         1. 절대 게임 이름(${currentAnswer})을 직접적으로 말하면 안 돼.
@@ -269,7 +209,7 @@
             'Authorization': `Bearer ${OPENAI_API_KEY}`
           },
           body: JSON.stringify({
-            model: 'gpt-4o-mini', // 가성비 좋고 빠른 모델 사용
+            model: 'gpt-4o-mini',
             messages: [{ role: 'user', content: gptPrompt }]
           })
         });
@@ -278,9 +218,9 @@
         if (chatData.error) throw new Error(chatData.error.message);
         const soundDescription = chatData.choices[0].message.content;
 
-        statusBox.textContent = "OpenAI TTS로 목소리 생성 중...";
+        statusBox.textContent = "OpenAI TTS로 목소리를 입히는 중...";
 
-        // 2. OpenAI Audio Speech API 직접 호출 (TTS 오디오 파일 가져오기)
+        // 2. OpenAI TTS API 호출
         const ttsResponse = await fetch('https://api.openai.com/v1/audio/speech', {
           method: 'POST',
           headers: {
@@ -300,7 +240,6 @@
           throw new Error(errData.error.message || "TTS 변환 실패");
         }
 
-        // Response 데이터를 Blob 데이터로 변환 후 오디오 재생 주소로 할당
         const audioBlob = await ttsResponse.blob();
         const audioUrl = URL.createObjectURL(audioBlob);
         
@@ -310,14 +249,14 @@
 
       } catch (error) {
         console.error(error);
-        statusBox.textContent = "오류가 발생했습니다: " + error.message;
+        statusBox.textContent = "문제를 가져오는 중 오류 발생: " + error.message;
       } finally {
         setLoading(false, "");
       }
     }
 
     // 정답 체크 함수
-    async function checkAnswer() {
+    function checkAnswer() {
       const userAnswer = answerInput.value.trim();
       if (!userAnswer) {
         alert("정답을 입력해주세요!");
@@ -334,7 +273,9 @@
         resultBox.innerHTML = `<div class="result-msg correct">🎉 정답입니다! (+10점)</div><p style="color:#bbb">정답: ${currentAnswer}</p>`;
         currentScore += 10;
         scoreDisplay.textContent = currentScore;
-        await saveUserScore(currentUser.uid, currentScore);
+        
+        // 내 컴퓨터 브라우저에 점수 누적 저장
+        localStorage.setItem('game_quiz_score', currentScore);
       } else {
         resultBox.innerHTML = `<div class="result-msg wrong">😢 틀렸습니다!</div><p style="color:#bbb">정답은 [ <b>${currentAnswer}</b> ] 이었습니다.</p>`;
       }
@@ -350,42 +291,27 @@
 
   <div class="container">
     <h1>🎮 AI 사운드 퀴즈</h1>
-    <div class="subtitle">접속 소리를 듣고 어떤 게임인지 맞춰보세요!</div>
+    <div class="subtitle">접속 소리를 듣고 어떤 게임인지 맞춰보세요! (로그인 프리패스 버전)</div>
 
-    <div id="loginSection" style="text-align: center; padding: 40px 0;">
-      <p style="color: #e0e0e0; margin-bottom: 20px;">퀴즈를 풀고 점수를 기록하려면 구글 로그인이 필요합니다.</p>
-      <button class="auth-btn" id="loginBtn">구글 계정으로 로그인</button>
-    </div>
-
-    <div id="quizSection" class="hidden">
-      <div class="user-profile">
-        <div class="user-info">
-          <img id="userAvatar" class="user-avatar" src="" alt="프로필">
-          <span id="userName">플레이어</span>
-        </div>
-        <button class="clear-btn" id="logoutBtn" style="height:32px; padding:0 10px; font-size:12px; background:#555; color:#fff;">로그아웃</button>
+    <div class="quiz-box">
+      <div class="score-board">나의 최고 점수: <span id="scoreDisplay">0</span>점</div>
+      
+      <div class="audio-section">
+        <div style="font-weight: bold; margin-bottom: 8px;">🔊 귀를 기울여 사운드를 들으세요</div>
+        <audio id="audioPlayer" controls></audio>
       </div>
 
-      <div class="quiz-box">
-        <div class="score-board">현재 누적 점수: <span id="scoreDisplay">0</span>점</div>
-        
-        <div class="audio-section">
-          <div style="font-weight: bold; margin-bottom: 8px;">🔊 귀를 기울여 사운드를 들으세요</div>
-          <audio id="audioPlayer" controls></audio>
-        </div>
-
-        <div style="margin-top: 15px;">
-          <input type="text" id="answerInput" placeholder="게임 이름을 입력하세요 (예: 리그 오브 레전드)" />
-        </div>
-
-        <div class="button-row">
-          <button class="success-btn" id="submitBtn">정답 제출</button>
-          <button class="primary-btn" id="nextBtn">다음 문제 불러오기 ➡️</button>
-        </div>
-
-        <div id="statusBox" class="status"></div>
-        <div id="resultBox"></div>
+      <div style="margin-top: 15px;">
+        <input type="text" id="answerInput" placeholder="게임 이름을 입력하세요 (예: 리그 오브 레전드)" />
       </div>
+
+      <div class="button-row">
+        <button class="success-btn" id="submitBtn">정답 제출</button>
+        <button class="primary-btn" id="nextBtn">다음 문제 불러오기 ➡️</button>
+      </div>
+
+      <div id="statusBox" class="status"></div>
+      <div id="resultBox"></div>
     </div>
   </div>
 
