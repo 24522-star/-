@@ -1,316 +1,87 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🎮 띵동! 이 게임은 무엇일까요? | AI 사운드 퀴즈</title>
+  <base target="_top">
+  <meta charset="UTF-8">
   <style>
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background: linear-gradient(135deg, #1f1c2c, #928dab);
-      font-family: 'Malgun Gothic', Arial, sans-serif;
-      color: #fff;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 12px; background-color: #f9f9f9; margin: 0; }
+    h3 { text-align: center; color: #2c3e50; margin-bottom: 15px; }
+    .container { display: flex; flex-direction: column; gap: 16px; }
+    .country-card {
+      background: #ffffff; border: 1px solid #e0e0e0; border-radius: 10px;
+      padding: 12px; text-align: center; cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      transition: transform 0.2s, box-shadow 0.2s;
     }
-
-    .container {
-      width: min(700px, 92%);
-      margin: 20px auto;
-      background: rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(10px);
-      border-radius: 24px;
-      padding: 28px;
-      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-    }
-
-    h1 {
-      margin: 0 0 8px;
-      text-align: center;
-      font-size: 28px;
-      color: #4fc3f7;
-      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-    }
-
-    .subtitle {
-      text-align: center;
-      color: #e0e0e0;
-      margin-bottom: 24px;
-      font-size: 14px;
-    }
-
-    .quiz-box {
-      background: rgba(0,0,0,0.2);
-      border-radius: 16px;
-      padding: 20px;
-      text-align: center;
-    }
-
-    .score-board {
-      font-size: 18px;
-      font-weight: bold;
-      color: #ffeb3b;
-      margin-bottom: 15px;
-    }
-
-    .audio-section {
-      margin: 25px 0;
-      padding: 15px;
-      background: rgba(255,255,255,0.05);
-      border-radius: 12px;
-    }
-
-    audio { width: 100%; margin-top: 10px; }
-
-    input[type="text"] {
-      width: 100%;
-      height: 48px;
-      padding: 0 16px;
-      border: 2px solid rgba(255,255,255,0.2);
-      border-radius: 12px;
-      font-size: 16px;
-      background: rgba(0,0,0,0.5);
-      color: white;
-      outline: none;
-      text-align: center;
-      transition: 0.2s;
-    }
-
-    input[type="text"]:focus {
-      border-color: #4fc3f7;
-      box-shadow: 0 0 10px rgba(79, 195, 247, 0.5);
-    }
-
-    .button-row {
-      display: flex;
-      gap: 10px;
-      justify-content: center;
-      margin-top: 15px;
-    }
-
-    button {
-      border: none;
-      border-radius: 12px;
-      padding: 0 24px;
-      height: 46px;
-      font-size: 15px;
-      cursor: pointer;
-      transition: 0.15s;
-      font-weight: bold;
-    }
-
-    button:hover { transform: translateY(-2px); opacity: 0.9; }
-    button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; }
-
-    .primary-btn { background: #4fc3f7; color: #111; }
-    .success-btn { background: #4caf50; color: white; }
-
-    .status {
-      min-height: 24px;
-      margin-top: 14px;
-      color: #ffca28;
-      font-size: 14px;
-      text-align: center;
-    }
-
-    .result-msg {
-      font-size: 20px;
-      font-weight: bold;
-      margin-top: 15px;
-    }
-    .correct { color: #4caf50; }
-    .wrong { color: #f44336; }
+    .country-card:hover { transform: translateY(-3px); box-shadow: 0 5px 12px rgba(0,0,0,0.12); }
+    .country-card img { width: 100%; max-height: 160px; object-fit: cover; border-radius: 6px; }
+    .country-name { margin-top: 10px; font-weight: bold; font-size: 16px; color: #34495e; }
+    #status { text-align: center; font-size: 13px; color: #3498db; font-weight: 600; margin-bottom: 15px; min-height: 38px; }
   </style>
-
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-    // 1. Firebase 구성 정보 설정 (향후 백엔드 확장을 위해 유지)
-    const firebaseConfig = {
-      apiKey: "YOUR_FIREBASE_API_KEY",
-      authDomain: "YOUR_FIREBASE_AUTH_DOMAIN",
-      projectId: "YOUR_FIREBASE_PROJECT_ID",
-      storageBucket: "YOUR_FIREBASE_STORAGE_BUCKET",
-      messagingSenderId: "YOUR_FIREBASE_MESSAGING_SENDER_ID",
-      appId: "YOUR_FIREBASE_APP_ID"
-    };
-
-    // Firebase 초기화
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    // 2. [변경 완료] 신규 발급된 OpenAI API Key 설정
-    const OPENAI_API_KEY = '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';
-
-    // 퀴즈용 게임 리스트
-    const GAME_LIST = ["리그 오브 레전드", "오버워치", "마인크래프트", "스타크래프트", "메이플스토리", "던전앤파이터", "배틀그라운드", "발로란트", "서든어택", "로스트아크"];
-
-    let currentScore = 0;
-    let currentAnswer = ""; 
-
-    // DOM 요소
-    const scoreDisplay = document.getElementById('scoreDisplay');
-    const statusBox = document.getElementById('statusBox');
-    const audioPlayer = document.getElementById('audioPlayer');
-    const nextBtn = document.getElementById('nextBtn');
-    const answerInput = document.getElementById('answerInput');
-    const submitBtn = document.getElementById('submitBtn');
-    const resultBox = document.getElementById('resultBox');
-
-    // 이벤트 바인딩
-    nextBtn.addEventListener('click', generateNewQuiz);
-    submitBtn.addEventListener('click', checkAnswer);
-    answerInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') checkAnswer(); });
-
-    // 페이지 로드 시 기존 최고 점수 불러오기 및 퀴즈 즉시 시작
-    window.addEventListener('DOMContentLoaded', () => {
-      const savedScore = localStorage.getItem('game_quiz_score');
-      currentScore = savedScore ? parseInt(savedScore, 10) : 0;
-      scoreDisplay.textContent = currentScore;
-      
-      generateNewQuiz();
-    });
-
-    // 🚀 새로운 퀴즈 생성 함수
-    async function generateNewQuiz() {
-      answerInput.value = "";
-      answerInput.disabled = false;
-      submitBtn.disabled = false;
-      resultBox.innerHTML = "";
-      audioPlayer.removeAttribute('src');
-      
-      const randomIndex = Math.floor(Math.random() * GAME_LIST.length);
-      currentAnswer = GAME_LIST[randomIndex];
-
-      try {
-        setLoading(true, "ChatGPT가 사운드를 열심히 묘사하고 있습니다...");
-
-        // 1. OpenAI Chat API 호출
-        const gptPrompt = `너는 게임 사운드 퀴즈 출제자야. 제시된 게임의 '로그인 창 화면 접속 사운드', '시그니처 배경음악(BGM)', 또는 가장 유명한 '캐릭터 대사나 효과음'을 실감 나게 말로 묘사해 줘. 
-        주의할 점:
-        1. 절대 게임 이름(${currentAnswer})을 직접적으로 말하면 안 돼.
-        2. 음성(TTS)으로 읽힐 테니 소리를 입으로 내는 것처럼 생생하게 설명해 줘. (예: "지이이잉~ 슈우우우우-! 웰컴 투 오버워치!" 같은 느낌)
-        3. 답을 맞출 수 있는 힌트 사운드 묘사 문장 딱 2~3줄만 출력해줘.
-        
-        대상 게임: ${currentAnswer}`;
-
-        const chatResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${OPENAI_API_KEY}`
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: [{ role: 'user', content: gptPrompt }]
-          })
-        });
-
-        const chatData = await chatResponse.json();
-        if (chatData.error) throw new Error(chatData.error.message);
-        const soundDescription = chatData.choices[0].message.content;
-
-        statusBox.textContent = "OpenAI TTS로 목소리를 입히는 중...";
-
-        // 2. OpenAI TTS API 호출
-        const ttsResponse = await fetch('https://api.openai.com/v1/audio/speech', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${OPENAI_API_KEY}`
-          },
-          body: JSON.stringify({
-            model: 'tts-1',
-            input: soundDescription,
-            voice: 'onyx',
-            response_format: 'mp3'
-          })
-        });
-
-        if (!ttsResponse.ok) {
-          const errData = await ttsResponse.json();
-          throw new Error(errData.error.message || "TTS 변환 실패");
-        }
-
-        const audioBlob = await ttsResponse.blob();
-        const audioUrl = URL.createObjectURL(audioBlob);
-        
-        audioPlayer.src = audioUrl;
-        audioPlayer.play();
-        statusBox.textContent = "🔊 사운드가 재생됩니다! 어떤 게임일까요?";
-
-      } catch (error) {
-        console.error(error);
-        statusBox.textContent = "문제를 가져오는 중 오류 발생: " + error.message;
-      } finally {
-        setLoading(false, "");
-      }
-    }
-
-    // 정답 체크 함수
-    function checkAnswer() {
-      const userAnswer = answerInput.value.trim();
-      if (!userAnswer) {
-        alert("정답을 입력해주세요!");
-        return;
-      }
-
-      answerInput.disabled = true;
-      submitBtn.disabled = true;
-
-      const cleanUser = userAnswer.replace(/\s+/g, '').toLowerCase();
-      const cleanTarget = currentAnswer.replace(/\s+/g, '').toLowerCase();
-
-      if (cleanUser === cleanTarget) {
-        resultBox.innerHTML = `<div class="result-msg correct">🎉 정답입니다! (+10점)</div><p style="color:#bbb">정답: ${currentAnswer}</p>`;
-        currentScore += 10;
-        scoreDisplay.textContent = currentScore;
-        
-        localStorage.setItem('game_quiz_score', currentScore);
-      } else {
-        resultBox.innerHTML = `<div class="result-msg wrong">😢 틀렸습니다!</div><p style="color:#bbb">정답은 [ <b>${currentAnswer}</b> ] 이었습니다.</p>`;
-      }
-    }
-
-    function setLoading(isLoading, text) {
-      nextBtn.disabled = isLoading;
-      if (isLoading) statusBox.textContent = text;
-    }
-  </script>
 </head>
 <body>
 
-  <div class="container">
-    <h1>🎮 AI 사운드 퀴즈</h1>
-    <div class="subtitle">접속 소리를 듣고 어떤 게임인지 맞춰보세요!</div>
+  <h3>🌍 나라 선택기</h3>
+  <div id="status">Firebase에서 데이터를 불러오는 중...</div>
+  <div class="container" id="countryList"></div>
 
-    <div class="quiz-box">
-      <div class="score-board">나의 현재 점수: <span id="scoreDisplay">0</span>점</div>
+  <script>
+    // 1. 페이지 로드 시 구글 스크립트를 통해 Firebase 데이터 요청
+    window.onload = function() {
+      google.script.run
+        .withSuccessHandler(renderCountries)
+        .withFailureHandler(showError)
+        .getCountriesFromFirebase();
+    };
+
+    // 2. 받아온 데이터를 바탕으로 카드 UI 동적 생성
+    function renderCountries(countries) {
+      document.getElementById('status').innerText = "💡 나라 카드를 클릭하면 AI 음성 가이드가 시작됩니다.";
+      const listDiv = document.getElementById('countryList');
+      listDiv.innerHTML = '';
+
+      countries.forEach(country => {
+        const card = document.createElement('div');
+        card.className = 'country-card';
+        card.onclick = () => selectCountry(country.name);
+
+        card.innerHTML = `
+          <img src="${country.image}" alt="${country.name}">
+          <div class="country-name">${country.name}</div>
+        `;
+        listDiv.appendChild(card);
+      });
+    }
+
+    // 3. 국가 클릭 시 ChatGPT 설명 요청
+    function selectCountry(name) {
+      document.getElementById('status').innerText = `🤖 ${name}의 특징을 분석하고 목소리를 만드는 중...`;
       
-      <div class="audio-section">
-        <div style="font-weight: bold; margin-bottom: 8px;">🔊 귀를 기울여 사운드를 들으세요</div>
-        <audio id="audioPlayer" controls></audio>
-      </div>
+      google.script.run
+        .withSuccessHandler(function(text) {
+          document.getElementById('status').innerText = "🔊 재생 중: " + text;
+          playTTS(text);
+        })
+        .withFailureHandler(showError)
+        .getCountryFact(name);
+    }
 
-      <div style="margin-top: 15px;">
-        <input type="text" id="answerInput" placeholder="게임 이름을 입력하세요 (예: 리그 오브 레전드)" />
-      </div>
+    // 4. 받아온 텍스트를 기반으로 구글 TTS 오디오 재생
+    function playTTS(text) {
+      google.script.run
+        .withSuccessHandler(function(base64Audio) {
+          const audio = new Audio("data:audio/mp3;base64," + base64Audio);
+          audio.play();
+        })
+        .withFailureHandler(showError)
+        .generateTTS(text);
+    }
 
-      <div class="button-row">
-        <button class="success-btn" id="submitBtn">정답 제출</button>
-        <button class="primary-btn" id="nextBtn">다음 문제 불러오기 ➡️</button>
-      </div>
-
-      <div id="statusBox" class="status"></div>
-      <div id="resultBox"></div>
-    </div>
-  </div>
-
+    // 에러 핸들러
+    function showError(err) {
+      document.getElementById('status').innerText = "❌ 에러 발생: " + err.message;
+      console.error(err);
+    }
+  </script>
 </body>
 </html>
